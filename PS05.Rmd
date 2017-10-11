@@ -1,6 +1,6 @@
 ---
 title: "STAT/MATH 495: Problem Set 05"
-author: "WRITE YOUR NAME HERE"
+author: "Jeff Lancaster"
 date: "2017-10-11"
 output:
   html_document:
@@ -26,6 +26,8 @@ library(tidyverse)
 train <- read_csv("data/train.csv")
 test <- read_csv("data/test.csv")
 sample_submission <- read_csv("data/sampleSubmission.csv")
+train$temp<-train$temp*(9/5)+32 # C-->F :)
+test$temp<-test$temp*(9/5)+32
 ```
 
 
@@ -39,19 +41,48 @@ Please indicate who you collaborated with on this assignment:
 Information on the competition can be found [here](https://www.kaggle.com/c/bike-sharing-demand).
 
 ```{r}
+ggplot(train,aes(x=count))+geom_bar()+xlab("Count variable ")+ylab("count")
+#As you increase the # of rentals starting at 0, the frequency decreases drastically.  Count is also very skewed so we will have to perform a transformation on it if we are going to use it as the response variable in our model.
 
+ggplot(train,aes(x=temp,y=count))+geom_point()+geom_smooth()
+#clear positive correlation up to around 90 degrees and negative correlation above that - will include in model
+
+ggplot(train,aes(x=count,y=humidity))+geom_point()+geom_smooth()
+#clear negative correlation - when it is more humid there are generally less rentals - however this variable will contain much of the same signal as temp - will not include in model
+
+ggplot(train,aes(x=count,y=windspeed))+geom_point()+geom_smooth()+geom_jitter() #No clear pattern - should leave out of model
+
+ggplot(train,aes(x=season,y=count))+geom_bar(stat="identity") #big difference between winter rentals and summer rentals - will include in model
+
+ggplot(train,aes(x=holiday,y=count))+geom_bar(stat="identity") #doesn't seem meaningful - will not include in model
+
+ggplot(train,aes(x=workingday,y=count))+geom_bar(stat="identity") #seems proprotional to the 5:2 ratio of weekdays:weekends - will not include in model
+
+ggplot(train,aes(x=weather,y=count))+geom_bar(stat="identity") #Assuming a lower value is better, this is very important and makes sense - however it is contains much of the same signal that temp does - will not include in model
+
+train<-mutate(train, time=format(datetime, "%H")) 
+hour <-train %>% 
+  group_by(time) %>%
+  summarise(count=mean(count))
+
+ggplot(hour,aes(x=time,y=count))+geom_point()
+#Seems that bike rentals are most popular during the daytime (as expected), and are most popular around 8am and 7-8pm (roughly sunrise and sunset) - will include this in model
 ```
 
 
 # Model Fit
 
 ```{r}
-
+mod<-lm(log(count)~temp+as.factor(time)+as.factor(season), data=train)
 ```
 
 
 # Create Submission File
 
 ```{r}
-
+test=mutate(test, time=format(datetime, "%H")) 
+test$yhat<-predict.lm(mod, test) #making predictions in our test based on our model
+csv<-test[,c(1,10)]
+colnames(csv)[2]="count"
+write.csv(csv, "submission.csv", row.names=FALSE)
 ```
